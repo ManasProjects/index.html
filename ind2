@@ -1,1 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Paper Tracker — Gupta Stone Mines</title>
+<style>
+  :root{
+    --bg: #0a0d12;
+    --panel: #11161e;
+    --panel-2: #161c26;
+    --border: #222a37;
+    --border-soft: #1a212c;
+    --ink: #e9eef5;
+    --muted: #7c899d;
+    --muted-2: #566275;
+    --amber: #f5a524;
+    --amber-dim: rgba(245,165,36,.13);
+    --red: #f0454b;
+    --red-dim: rgba(240,69,75,.13);
+    --yellow: #e8d24a;
+    --yellow-dim: rgba(232,210,74,.11);
+    --green: #29c46b;
+    --green-dim: rgba(41,196,107,.11);
+    --blue: #5b8cff;
+    --mono: ui-monospace,'SFMono-Regular','DM Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1100px 560px at 88% -8%, rgba(91,140,255,.08), transparent 58%),
+      radial-gradient(900px 480px at -8% 8%, rgba(245,165,36,.055), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 18px 90px;}
 
+  #errBanner{display:none;position:sticky;top:0;z-index:99;background:#2a1416;border:1px solid rgba(240,69,75,.4);
+    color:#ffb3b6;padding:10px 14px;border-radius:10px;font-size:12.5px;margin-bottom:14px;font-family:var(--mono);}
+
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px;
+    padding-bottom:18px;border-bottom:1px solid var(--border-soft);}
+  .brand{display:flex;align-items:center;gap:13px;}
+  .brand-mark{
+    width:44px;height:44px;border-radius:11px;
+    background:linear-gradient(150deg,#1c2636,#0d131c);
+    border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:700;color:var(--amber);font-size:17px;letter-spacing:-.5px;
+    flex-shrink:0;
+  }
+  h1{font-size:19.5px;margin:0;letter-spacing:.1px;font-weight:650;}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:3px;}
+  .clock{text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted);}
+  .clock .today{color:var(--ink);font-weight:600;font-size:13px;}
+  .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:7px;
+    box-shadow:0 0 0 0 rgba(41,196,107,.6);animation:pulse 2.2s infinite;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(41,196,107,.5);}
+    70%{box-shadow:0 0 0 6px rgba(41,196,107,0);}
+    100%{box-shadow:0 0 0 0 rgba(41,196,107,0);}
+  }
+
+  /* Tabs */
+  .tabs{display:flex;gap:6px;margin-bottom:20px;background:var(--panel);border:1px solid var(--border);
+    border-radius:11px;padding:4px;width:fit-content;}
+  .tab{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none;transition:.12s;}
+  .tab.active{background:var(--blue);color:#fff;}
+  .tab:hover:not(.active){color:var(--ink);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+  .kpi{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px 17px;
+    position:relative;overflow:hidden;
+  }
+  .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--muted-2);}
+  .kpi .n{font-family:var(--mono);font-size:27px;font-weight:700;line-height:1;}
+  .kpi .l{color:var(--muted);font-size:11px;margin-top:7px;text-transform:uppercase;letter-spacing:.07em;}
+  .kpi.expired::before{background:var(--red);} .kpi.expired .n{color:var(--red);}
+  .kpi.critical::before{background:var(--amber);} .kpi.critical .n{color:var(--amber);}
+  .kpi.warning::before{background:var(--yellow);} .kpi.warning .n{color:var(--yellow);}
+  .kpi.total::before{background:var(--blue);} .kpi.total .n{color:var(--blue);}
+
+  .section-title{display:flex;align-items:center;gap:9px;margin:28px 0 11px;font-size:12.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.08em;font-weight:650;}
+  .section-title .dot{width:7px;height:7px;border-radius:50%;background:var(--red);}
+  .section-title .cnt{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:1px 9px;color:var(--ink);font-family:var(--mono);font-size:11.5px;}
+
+  .alert-list{display:flex;flex-direction:column;gap:7px;}
+  .alert{
+    display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);
+    border-left:3px solid var(--red);border-radius:10px;padding:11px 14px;
+    cursor:pointer; transition:transform .12s ease, background .12s ease;
+  }
+  .alert:hover{background:var(--panel-2);transform:translateX(2px);}
+  .alert.amber{border-left-color:var(--amber);}
+  .alert.ok{border-left-color:var(--green);}
+  .alert .badge{
+    font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;
+    background:var(--red-dim);color:#ff9195;white-space:nowrap;letter-spacing:.03em;
+  }
+  .alert.amber .badge{background:var(--amber-dim);color:var(--amber);}
+  .alert.ok .badge{background:var(--green-dim);color:var(--green);}
+  .alert .veh{font-weight:650;font-size:13.5px;min-width:132px;font-family:var(--mono);}
+  .alert .doc{color:var(--muted);font-size:12.5px;flex:1;}
+  .alert .doc b{color:var(--ink);font-weight:600;}
+  .alert .days{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;}
+  .empty-state{color:var(--muted);font-size:13px;padding:18px;text-align:center;background:var(--panel);border:1px dashed var(--border);border-radius:10px;}
+  .empty-state b{color:var(--green);}
+
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:26px 0 12px;}
+  input[type=text]{
+    background:var(--panel);border:1px solid var(--border);color:var(--ink);border-radius:9px;
+    padding:9px 12px;font-size:13px;width:230px;outline:none;
+  }
+  input[type=text]:focus{border-color:var(--blue);}
+  .chip{
+    background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:20px;
+    padding:6px 13px;font-size:12px;cursor:pointer;user-select:none;transition:.12s;white-space:nowrap;
+  }
+  .chip.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .chip:hover{border-color:var(--blue);}
+  .spacer{flex:1;}
+  .tax-ref{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:8px 13px;}
+  .tax-ref b{color:var(--amber);font-weight:700;}
+
+  .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--panel);}
+  table{border-collapse:collapse;width:100%;min-width:920px;}
+  thead th{
+    position:sticky;top:0;background:var(--panel-2);z-index:2;
+    text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
+    padding:12px 12px;border-bottom:1px solid var(--border);font-weight:650;
+  }
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--border-soft);font-size:13px;vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:rgba(255,255,255,.015);}
+  .vehcell .vno{font-family:var(--mono);font-weight:650;font-size:12.6px;}
+  .vehcell .vname{color:var(--muted);font-size:11.3px;margin-top:2px;}
+  .cell-doc{cursor:pointer;border-radius:8px;padding:7px 9px;min-width:116px;transition:filter .1s;}
+  .cell-doc:hover{filter:brightness(1.2);}
+  .cell-doc .date{font-family:var(--mono);font-size:11.8px;}
+  .cell-doc .days{font-size:10.8px;margin-top:2px;opacity:.9;}
+  .st-expired{background:var(--red-dim);color:#ff9195;}
+  .st-critical{background:var(--amber-dim);color:#ffcc80;}
+  .st-warning{background:var(--yellow-dim);color:#eee08c;}
+  .st-ok{background:var(--green-dim);color:#8fe8ab;}
+  .st-grace{background:rgba(245,165,36,.19);color:#ffcc80;}
+  .st-none{background:rgba(255,255,255,.03);color:var(--muted-2);}
+  .st-skip{background:rgba(255,255,255,.02);color:#4c5666;font-style:italic;}
+
+  /* Monthly view */
+  .month-chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px;}
+  .month-chip{
+    flex-shrink:0;background:var(--panel);border:1px solid var(--border);color:var(--muted);
+    border-radius:10px;padding:9px 15px;font-size:12.5px;font-weight:650;cursor:pointer;text-align:center;
+    font-family:var(--mono);transition:.12s;position:relative;
+  }
+  .month-chip .cnt{display:block;font-size:16px;margin-top:3px;color:var(--ink);}
+  .month-chip.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .month-chip.active .cnt{color:#fff;}
+  .month-chip.has-urgent:not(.active)::after{
+    content:'';position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--red);
+  }
+  .manual-jump{display:flex;gap:8px;align-items:center;margin:14px 0 22px;font-size:12.5px;color:var(--muted);flex-wrap:wrap;}
+  .manual-jump select{
+    background:var(--panel);border:1px solid var(--border);color:var(--ink);border-radius:8px;
+    padding:7px 10px;font-size:13px;outline:none;font-family:inherit;
+  }
+  .month-summary{font-size:13.5px;color:var(--muted);margin:4px 0 16px;}
+  .month-summary b{color:var(--ink);}
+  .month-list{display:flex;flex-direction:column;gap:7px;}
+  .month-row{
+    display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:12px 15px;cursor:pointer;transition:.12s;
+  }
+  .month-row:hover{background:var(--panel-2);}
+  .month-row .datebox{
+    font-family:var(--mono);text-align:center;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:8px;padding:6px 10px;min-width:44px;flex-shrink:0;
+  }
+  .month-row .datebox .dnum{font-size:17px;font-weight:700;line-height:1;}
+  .month-row .datebox .dwd{font-size:9.5px;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+  .month-row .info{flex:1;min-width:0;}
+  .month-row .info .v{font-family:var(--mono);font-weight:650;font-size:13px;}
+  .month-row .info .n{color:var(--muted);font-size:12px;margin-top:1px;}
+  .month-row .docpill{
+    font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;
+  }
+  .month-row .statuspill{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;min-width:90px;text-align:right;}
+
+  footer{margin-top:36px;color:var(--muted-2);font-size:11.3px;text-align:center;font-family:var(--mono);line-height:1.7;}
+  footer .tag{display:inline-block;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:3px 10px;margin-top:6px;}
+
+  .overlay{position:fixed;inset:0;background:rgba(3,6,10,.65);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:340px;max-width:100%;padding:20px;position:relative;}
+  .modal h3{margin:0 0 4px;font-size:15px;font-family:var(--mono);}
+  .modal .m-sub{color:var(--muted);font-size:12px;margin-bottom:14px;}
+  .modal label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;margin-top:12px;}
+  .modal input[type=date]{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--ink);
+    border-radius:8px;padding:9px 10px;font-family:var(--mono);font-size:13px;outline:none;
+    color-scheme: dark;
+  }
+  .modal .row{display:flex;gap:10px;}
+  .modal .row > div{flex:1;}
+  .modal .persist-note{font-size:10.7px;color:var(--muted-2);margin-top:12px;font-family:var(--mono);}
+  .modal .actions{display:flex;gap:8px;margin-top:18px;}
+  .btn{flex:1;padding:9px 10px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);color:var(--ink);
+    font-size:13px;cursor:pointer;font-weight:600;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .btn.danger{background:transparent;border-color:rgba(240,69,75,.4);color:var(--red);}
+  .btn:hover{filter:brightness(1.12);}
+  .close-x{position:absolute;top:14px;right:16px;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;}
+
+  @media(max-width:640px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .clock{text-align:left;}
+    header{flex-direction:column;}
+    .month-row{flex-wrap:wrap;}
+    .month-row .statuspill{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="errBanner"></div>
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">GS</div>
+      <div>
+        <h1>Fleet Paper Tracker</h1>
+        <div class="sub">Gupta Stone Mines &middot; Insurance &middot; Permit &middot; Pollution &middot; Fitness &middot; Tax</div>
+      </div>
+    </div>
+    <div class="clock">
+      <div class="today"><span class="live-dot"></span><span id="todayStr">—</span></div>
+      <div id="tickStr" style="margin-top:3px;">initialising…</div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab" data-tab="monthly">Month-wise Planner</div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="view active" id="view-overview">
+    <div class="kpis">
+      <div class="kpi expired"><div class="n" id="kpiExpired">0</div><div class="l">Expired</div></div>
+      <div class="kpi critical"><div class="n" id="kpiCritical">0</div><div class="l">Due &le; 7 days</div></div>
+      <div class="kpi warning"><div class="n" id="kpiWarning">0</div><div class="l">Due &le; 30 days</div></div>
+      <div class="kpi total"><div class="n" id="kpiTotal">0</div><div class="l">Vehicles Tracked</div></div>
+    </div>
+
+    <div class="section-title"><span class="dot"></span> Needs Action Now <span class="cnt" id="alertCount">0</span></div>
+    <div class="alert-list" id="alertList"></div>
+
+    <div class="controls">
+      <input type="text" id="search" placeholder="Search vehicle no. or name…">
+      <div class="chip active" data-filter="all">All vehicles</div>
+      <div class="chip" data-filter="urgent">Expired / urgent only</div>
+      <div class="spacer"></div>
+      <div class="tax-ref">Tax rate — <b>10 tyre</b> ₹5,800 &nbsp;/&nbsp; <b>12 tyre</b> ₹7,200 &nbsp;/&nbsp; <b>14 tyre</b> ₹8,600 &nbsp;&middot;&nbsp; 15-day grace after tax expiry</div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Vehicle</th>
+            <th>Insurance</th>
+            <th>Permit</th>
+            <th>Pollution</th>
+            <th>Fitness</th>
+            <th>Tax</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MONTHLY -->
+  <div class="view" id="view-monthly">
+    <div class="section-title"><span class="dot" style="background:var(--blue)"></span> Pick a month</div>
+    <div class="month-chips" id="monthChips"></div>
+    <div class="manual-jump">
+      Jump to any month:
+      <select id="jumpMonth"></select>
+      <select id="jumpYear"></select>
+    </div>
+    <div class="month-summary" id="monthSummary"></div>
+    <div class="month-list" id="monthList"></div>
+  </div>
+
+  <footer>
+    Tap any coloured cell or list row to update its renewal date after you've paid/renewed.<br>
+    <span class="tag" id="persistTag">checking save mode…</span>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <span class="close-x" id="modalClose">✕</span>
+    <h3 id="mTitle">Update date</h3>
+    <div class="m-sub" id="mSub"></div>
+    <div class="row">
+      <div>
+        <label>Valid from</label>
+        <input type="date" id="mFrom">
+      </div>
+      <div>
+        <label>Valid to</label>
+        <input type="date" id="mTo">
+      </div>
+    </div>
+    <div class="persist-note" id="persistNote"></div>
+    <div class="actions">
+      <button class="btn danger" id="mReset">Reset</button>
+      <button class="btn primary" id="mSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error', function(e){
+  try{
+    var b = document.getElementById('errBanner');
+    if(b){
+      b.style.display='block';
+      b.textContent = 'Something went wrong: ' + (e.message || 'unknown error') + '. Your data is safe — try reloading the page.';
+    }
+  }catch(_e){}
+});
+
+var DATA = [{"vehicle_no": "CG-04 JD-6895", "name": "DALABODY", "type": "DALABODY", "company": "TATA", "insurance": {"from": "2025-12-28", "to": "2026-12-27"}, "permit": {"from": "2021-08-19", "to": "2026-08-18"}, "pollution": {"from": "2026-07-24", "to": "2026-01-23"}, "fitness": {"from": "2026-07-24", "to": "2027-07-23"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 12, "skip_docs": {}, "reg_date": "2014-01-01"}, {"vehicle_no": "CG-04 LF-0186", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2023-08-22", "to": "2024-08-21"}, "permit": {"from": "2022-10-20", "to": "2027-10-19"}, "pollution": {"from": null, "to": "2024-06-13"}, "fitness": {"from": "2022-10-08", "to": "2023-10-07"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-01-01"}, {"vehicle_no": "CG-04 LF-1475", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-08-22", "to": "2026-08-21"}, "permit": {"from": "2022-10-20", "to": "2027-10-19"}, "pollution": {"from": "2026-02-07", "to": "2026-08-06"}, "fitness": {"from": "2025-11-28", "to": "2026-11-27"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-02-01"}, {"vehicle_no": "CG-04 LF-1479", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-08-22", "to": "2026-08-21"}, "permit": {"from": "2022-10-20", "to": "2027-10-19"}, "pollution": {"from": "2026-02-07", "to": "2026-08-06"}, "fitness": {"from": "2026-02-24", "to": "2027-02-23"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-03-29"}, {"vehicle_no": "CG-04 LF-1481", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-08-22", "to": "2026-08-21"}, "permit": {"from": "2022-11-11", "to": "2027-11-10"}, "pollution": {"from": "2026-02-07", "to": "2026-08-06"}, "fitness": {"from": "2025-11-28", "to": "2026-11-27"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-02-01"}, {"vehicle_no": "CG-04 LF-1484", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2023-08-22", "to": "2024-08-21"}, "permit": {"from": "2023-01-17", "to": "2028-01-16"}, "pollution": {"from": null, "to": "2025-06-13"}, "fitness": {"from": "2022-10-08", "to": "2023-10-07"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-02-01"}, {"vehicle_no": "CG-04 LF-1488", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-08-22", "to": "2026-08-21"}, "permit": {"from": "2023-01-17", "to": "2028-01-16"}, "pollution": {"from": "2026-02-07", "to": "2026-08-06"}, "fitness": {"from": "2025-11-28", "to": "2026-11-27"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-02-01"}, {"vehicle_no": "CG-04 LL-8115", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2023-10-21", "to": "2024-10-20"}, "permit": {"from": "2023-01-10", "to": "2028-01-09"}, "pollution": {"from": null, "to": "2024-06-13"}, "fitness": {"from": "2022-01-05", "to": "2024-01-04"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-07-01"}, {"vehicle_no": "CG-04 LL-8117", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-10-21", "to": "2026-10-20"}, "permit": {"from": "2023-01-10", "to": "2028-01-09"}, "pollution": {"from": "2026-03-09", "to": "2026-09-08"}, "fitness": {"from": "2024-06-04", "to": "2026-06-03"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-10-28"}, {"vehicle_no": "CG-04 LL-8121", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-10-21", "to": "2026-10-20"}, "permit": {"from": "2023-01-10", "to": "2028-01-09"}, "pollution": {"from": "2026-02-07", "to": "2026-08-06"}, "fitness": {"from": "2024-07-04", "to": "2026-07-03"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2016-08-01"}, {"vehicle_no": "CG-09 JJ-7539", "name": "DIESEL TANKER", "type": "DIESEL TANKER", "company": "MAHINDRA", "insurance": {"from": "2026-05-10", "to": "2027-05-09"}, "permit": null, "pollution": {"from": "2026-03-09", "to": "2027-03-08"}, "fitness": {"from": "2024-06-04", "to": "2026-06-03"}, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": "2019-04-01"}, {"vehicle_no": "CG-10 AJ-0698", "name": "HYUANDA", "type": null, "company": null, "insurance": {"from": "2024-10-04", "to": "2025-10-03"}, "permit": null, "pollution": null, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {"insurance": true}, "reg_date": null}, {"vehicle_no": "CG-10 AM-4100", "name": "W.R.V", "type": null, "company": null, "insurance": {"from": "2026-03-23", "to": "2027-03-22"}, "permit": null, "pollution": {"from": "2025-08-04", "to": "2026-08-03"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-10 AS-4100", "name": "VOLVO", "type": null, "company": null, "insurance": {"from": "2026-05-10", "to": "2027-05-09"}, "permit": null, "pollution": {"from": "2025-08-04", "to": "2026-08-03"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-10 AV-4100", "name": "Harrier", "type": null, "company": null, "insurance": {"from": "2025-11-21", "to": "2026-11-20"}, "permit": null, "pollution": {"from": "2026-01-13", "to": "2027-01-12"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-10 AY-4100", "name": "Fortuner", "type": null, "company": null, "insurance": {"from": "2025-10-19", "to": "2026-10-18"}, "permit": null, "pollution": {"from": "2026-03-17", "to": "2027-03-16"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-10 BF-5242", "name": "TRACTOR", "type": "TRACTOR", "company": "INTERNATIONAL TRACTORS LTD", "insurance": {"from": "2025-10-14", "to": "2026-10-13"}, "permit": null, "pollution": {"from": "2026-04-07", "to": "2026-10-06"}, "fitness": {"from": null, "to": "2036-10-10"}, "tax": {"from": "2025-06-01", "to": "2025-08-31"}, "tyre_no": null, "skip_docs": {}, "reg_date": "2021-03-01"}, {"vehicle_no": "CG-10 BT - 4100", "name": "Urban Cruiser", "type": null, "company": null, "insurance": {"from": "2026-05-10", "to": "2027-05-09"}, "permit": null, "pollution": {"from": "2025-11-08", "to": "2026-11-07"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-10 C-5257", "name": "WATER TANKER", "type": "WATER TANKER", "company": "TATA", "insurance": {"from": "2025-09-27", "to": "2026-09-26"}, "permit": {"from": "2019-10-04", "to": "2030-05-23"}, "pollution": {"from": "2025-04-07", "to": "2026-10-06"}, "fitness": {"from": "2025-04-01", "to": "2026-03-31"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2009-10-01"}, {"vehicle_no": "CG-10 C-6719", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2026-03-13", "to": "2027-03-12"}, "permit": {"from": "2022-06-29", "to": "2027-06-28"}, "pollution": {"from": "2026-02-07", "to": "2026-08-06"}, "fitness": {"from": "2025-10-17", "to": "2026-10-16"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2011-09-01"}, {"vehicle_no": "CG-10 C-7463", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2026-06-04", "to": "2027-06-03"}, "permit": {"from": "2022-06-29", "to": "2027-06-28"}, "pollution": {"from": "2026-02-07", "to": "2026-08-06"}, "fitness": {"from": "2025-10-17", "to": "2026-10-16"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 10, "skip_docs": {}, "reg_date": "2012-06-14"}, {"vehicle_no": "CG-12 BQ -4100", "name": "Innova", "type": null, "company": null, "insurance": {"from": "2025-10-30", "to": "2026-10-29"}, "permit": null, "pollution": {"from": "2025-11-08", "to": "2026-11-07"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-12 BR - 4100", "name": "Xuv700", "type": null, "company": null, "insurance": {"from": "2025-12-19", "to": "2026-12-18"}, "permit": null, "pollution": {"from": "2025-12-19", "to": "2026-12-18"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-16 CP-4100", "name": "Fortuner", "type": null, "company": null, "insurance": {"from": "2026-07-25", "to": "2027-07-24"}, "permit": null, "pollution": {"from": "2026-04-18", "to": "2027-04-17"}, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "CG-22 H-8117", "name": "DALABODY", "type": "DALABODY", "company": "OTHER", "insurance": {"from": "2025-09-06", "to": "2026-09-05"}, "permit": {"from": "2021-11-12", "to": "2026-11-11"}, "pollution": {"from": "2025-09-05", "to": "2026-09-04"}, "fitness": {"from": "2025-09-29", "to": "2026-09-28"}, "tax": {"from": "2026-07-01", "to": "2026-09-30"}, "tyre_no": 14, "skip_docs": {}, "reg_date": "2017-08-01"}, {"vehicle_no": "CG-22 J-3892", "name": "DALABODY", "type": "DALABODY", "company": "OTHER", "insurance": {"from": "2025-12-21", "to": "2026-12-20"}, "permit": {"from": "2021-12-21", "to": "2026-12-20"}, "pollution": {"from": "2025-08-04", "to": "2026-08-03"}, "fitness": {"from": "2026-01-18", "to": "2027-01-17"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 14, "skip_docs": {}, "reg_date": "2017-12-01"}, {"vehicle_no": "CG-22 J-3905", "name": "DALABODY", "type": "DALABODY", "company": "OTHER", "insurance": {"from": "2026-02-05", "to": "2027-02-04"}, "permit": {"from": "2023-06-05", "to": "2028-06-04"}, "pollution": {"from": "2025-08-04", "to": "2026-08-03"}, "fitness": {"from": "2025-05-15", "to": "2027-05-14"}, "tax": {"from": "2026-05-01", "to": "2026-07-31"}, "tyre_no": 14, "skip_docs": {}, "reg_date": "2018-01-03"}, {"vehicle_no": "CG10BH9597", "name": "LOADER", "type": "LOADER", "company": "JCB INDIA LTD", "insurance": {"from": "2022-05-02", "to": "2023-05-01"}, "permit": null, "pollution": {"from": "2025-09-05", "to": "2026-09-04"}, "fitness": {"from": null, "to": "2037-05-12"}, "tax": {"from": "2026-04-01", "to": "2027-03-31"}, "tyre_no": "JCB", "skip_docs": {"insurance": true}, "reg_date": "2022-05-13"}, {"vehicle_no": "CG10BJ1802", "name": "LOADER", "type": "LOADER", "company": "JCB INDIA LTD", "insurance": {"from": "2022-05-31", "to": "2023-05-30"}, "permit": {"from": null, "to": "2037-06-03"}, "pollution": {"from": "2025-09-05", "to": "2026-09-04"}, "fitness": {"from": null, "to": "2037-06-03"}, "tax": {"from": "2026-05-01", "to": "2027-04-30"}, "tyre_no": "JCB ", "skip_docs": {}, "reg_date": "2022-06-04"}, {"vehicle_no": "CG10CF2179", "name": "DIESEL TANKER", "type": "DIESEL TANKER", "company": "MAHINDRA", "insurance": {"from": "2026-05-04", "to": "2027-05-03"}, "permit": {"from": null, "to": "2031-06-17"}, "pollution": {"from": "2026-06-17", "to": "2027-06-16"}, "fitness": {"from": null, "to": "2028-06-15"}, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": "2026-06-17"}, {"vehicle_no": "CG11BP7934", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-12-26", "to": "2026-12-25"}, "permit": {"from": "2025-01-17", "to": "2030-01-16"}, "pollution": {"from": "2025-12-27", "to": "2026-12-26"}, "fitness": {"from": "2024-12-26", "to": "2026-12-25"}, "tax": {"from": "2026-06-01", "to": "2026-08-31"}, "tyre_no": 12, "skip_docs": {}, "reg_date": "2024-12-26"}, {"vehicle_no": "CG11BP7935", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-12-25", "to": "2026-12-24"}, "permit": {"from": "2025-01-17", "to": "2030-01-16"}, "pollution": {"from": "2025-12-27", "to": "2026-12-26"}, "fitness": {"from": "2024-12-26", "to": "2026-12-25"}, "tax": {"from": "2026-06-01", "to": "2026-08-31"}, "tyre_no": 12, "skip_docs": {}, "reg_date": "2024-12-26"}, {"vehicle_no": "CG11BP7936", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-12-25", "to": "2026-12-24"}, "permit": {"from": "2025-01-17", "to": "2030-01-16"}, "pollution": {"from": "2025-12-27", "to": "2026-12-26"}, "fitness": {"from": "2024-12-26", "to": "2026-12-25"}, "tax": {"from": "2026-06-01", "to": "2026-08-31"}, "tyre_no": 12, "skip_docs": {}, "reg_date": "2024-12-26"}, {"vehicle_no": "CG11BP7937", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-12-26", "to": "2026-12-25"}, "permit": {"from": "2025-01-17", "to": "2030-01-16"}, "pollution": {"from": "2025-12-27", "to": "2026-12-26"}, "fitness": {"from": "2024-12-26", "to": "2026-12-25"}, "tax": {"from": "2026-06-01", "to": "2026-08-31"}, "tyre_no": 12, "skip_docs": {}, "reg_date": "2024-12-26"}, {"vehicle_no": "CG11BP7938", "name": "HAIWA", "type": "HAIWA", "company": "TATA", "insurance": {"from": "2025-12-25", "to": "2026-12-24"}, "permit": {"from": "2025-01-17", "to": "2030-01-16"}, "pollution": {"from": "2025-12-27", "to": "2026-12-26"}, "fitness": {"from": "2024-12-26", "to": "2026-12-25"}, "tax": {"from": "2026-06-01", "to": "2026-08-31"}, "tyre_no": 12, "skip_docs": {}, "reg_date": "2024-12-26"}, {"vehicle_no": "CG16A4755", "name": "WATER TANKER", "type": "WATER TANKER", "company": null, "insurance": {"from": "2025-11-25", "to": "2026-11-24"}, "permit": {"from": "2026-01-13", "to": "2031-01-12"}, "pollution": {"from": "2026-07-18", "to": "2027-01-17"}, "fitness": {"from": "2025-06-02", "to": "2026-06-30"}, "tax": {"from": "2026-06-01", "to": "2026-08-31"}, "tyre_no": 10, "skip_docs": {}, "reg_date": null}, {"vehicle_no": "JH-01 BV-4100", "name": "Innova", "type": null, "company": null, "insurance": {"from": "2025-11-23", "to": "2026-11-22"}, "permit": null, "pollution": null, "fitness": null, "tax": null, "tyre_no": null, "skip_docs": {}, "reg_date": null}];
+
+var DOCS = [
+  {key:'insurance', label:'Insurance', color:'#5b8cff'},
+  {key:'permit',    label:'Permit', color:'#c084fc'},
+  {key:'pollution', label:'Pollution', color:'#34d399'},
+  {key:'fitness',   label:'Fitness', color:'#f472b6'},
+  {key:'tax',       label:'Tax', color:'#f5a524'}
+];
+var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var WD_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var TAX_RATES = {10:5800, 12:7200, 14:8600};
+var TAX_GRACE_DAYS = 15;
+var CRITICAL_DAYS = 7;
+var WARNING_DAYS = 30;
+
+var overrides = {};
+var currentEdit = null;
+var hasStorage = false;
+var selectedMonth = null; // {year, month} month 0-indexed
+var activeTab = 'overview';
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function parseISO(s){
+  if(!s) return null;
+  var parts = s.split('-').map(Number);
+  if(parts.length!==3 || parts.some(isNaN)) return null;
+  return new Date(parts[0], parts[1]-1, parts[2]);
+}
+function localISO(d){
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+}
+function todayMidnight(){
+  var n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+function daysBetween(a,b){
+  return Math.round((b-a)/86400000);
+}
+function displayDate(iso){
+  if(!iso) return '—';
+  var d = parseISO(iso);
+  if(!d) return '—';
+  return pad2(d.getDate())+' '+MONTH_SHORT[d.getMonth()]+' '+d.getFullYear();
+}
+function ovKey(vno, doc){ return vno+'|'+doc; }
+
+function getDocData(v, docKey){
+  var ov = overrides[ovKey(v.vehicle_no, docKey)];
+  if(ov) return ov;
+  return v[docKey];
+}
+
+function classify(v, docKey){
+  if(v.skip_docs && v.skip_docs[docKey]){
+    return {status:'skip', label:'Not required', daysLeft:null};
+  }
+  var d = getDocData(v, docKey);
+  if(!d || !d.to){
+    return {status:'none', label:'No data', daysLeft:null};
+  }
+  var to = parseISO(d.to);
+  if(!to){
+    return {status:'none', label:'No data', daysLeft:null};
+  }
+  var today = todayMidnight();
+  var daysLeft = daysBetween(today, to);
+
+  if(docKey === 'tax'){
+    if(daysLeft >= 0){
+      if(daysLeft <= CRITICAL_DAYS) return {status:'critical', label:'Due in '+daysLeft+'d', daysLeft:daysLeft};
+      if(daysLeft <= WARNING_DAYS) return {status:'warning', label:'Due in '+daysLeft+'d', daysLeft:daysLeft};
+      return {status:'ok', label:daysLeft+'d left', daysLeft:daysLeft};
+    } else {
+      var graceEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate()+TAX_GRACE_DAYS);
+      var graceDaysLeft = daysBetween(today, graceEnd);
+      if(graceDaysLeft >= 0){
+        return {status:'grace', label:'Renew by '+displayDate(localISO(graceEnd))+' ('+graceDaysLeft+'d grace left)', daysLeft:daysLeft};
+      }
+      return {status:'expired', label:'Overdue '+(-graceDaysLeft)+'d past grace', daysLeft:daysLeft};
+    }
+  }
+
+  if(daysLeft < 0) return {status:'expired', label:'Expired '+(-daysLeft)+'d ago', daysLeft:daysLeft};
+  if(daysLeft <= CRITICAL_DAYS) return {status:'critical', label:'Due in '+daysLeft+'d', daysLeft:daysLeft};
+  if(daysLeft <= WARNING_DAYS) return {status:'warning', label:'Due in '+daysLeft+'d', daysLeft:daysLeft};
+  return {status:'ok', label:daysLeft+'d left', daysLeft:daysLeft};
+}
+
+function taxAmount(v){
+  var t = v.tyre_no;
+  if(typeof t === 'number' && TAX_RATES[t]) return TAX_RATES[t];
+  return null;
+}
+
+function statusClass(s){
+  var m = {
+    expired:'st-expired', critical:'st-critical', warning:'st-warning',
+    ok:'st-ok', grace:'st-grace', none:'st-none', skip:'st-skip'
+  };
+  return m[s] || 'st-none';
+}
+
+function detectStorage(){
+  try{
+    hasStorage = (typeof window.storage !== 'undefined') &&
+                 typeof window.storage.get === 'function' &&
+                 typeof window.storage.set === 'function';
+  }catch(e){ hasStorage = false; }
+  var tag = document.getElementById('persistTag');
+  if(tag){
+    tag.textContent = hasStorage
+      ? 'Renewal edits are saved on this device'
+      : 'Renewal edits are saved for this browser session only';
+  }
+  var note = document.getElementById('persistNote');
+  if(note){
+    note.textContent = hasStorage
+      ? 'Saved permanently on this device.'
+      : 'Saved only until you close this tab (storage unavailable here).';
+  }
+}
+
+function loadOverrides(){
+  return new Promise(function(resolve){
+    if(!hasStorage){ resolve(); return; }
+    window.storage.get('doc-overrides', false).then(function(r){
+      try{
+        if(r && r.value){ overrides = JSON.parse(r.value); }
+      }catch(e){ overrides = {}; }
+      resolve();
+    }).catch(function(){ overrides = {}; resolve(); });
+  });
+}
+function saveOverrides(){
+  if(!hasStorage) return Promise.resolve();
+  return window.storage.set('doc-overrides', JSON.stringify(overrides), false).catch(function(e){
+    console.error('storage save failed', e);
+  });
+}
+
+/* ---------- Collect every (vehicle, doc) entry with a real date ---------- */
+function allEntries(){
+  var out = [];
+  DATA.forEach(function(v){
+    DOCS.forEach(function(dc){
+      if(v.skip_docs && v.skip_docs[dc.key]) return;
+      var d = getDocData(v, dc.key);
+      if(!d || !d.to) return;
+      var to = parseISO(d.to);
+      if(!to) return;
+      var c = classify(v, dc.key);
+      out.push({v:v, dc:dc, to:to, c:c});
+    });
+  });
+  return out;
+}
+
+/* ================= OVERVIEW RENDER ================= */
+function renderOverview(){
+  var today = todayMidnight();
+  document.getElementById('todayStr').textContent = today.toLocaleDateString('en-IN',{weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+  document.getElementById('tickStr').textContent = 'live · ' + new Date().toLocaleTimeString('en-IN');
+
+  var filterEl = document.querySelector('#view-overview .chip.active');
+  var filter = filterEl ? filterEl.dataset.filter : 'all';
+  var q = document.getElementById('search').value.trim().toLowerCase();
+
+  var expiredCt=0, criticalCt=0, warningCt=0;
+  var alerts = [];
+
+  DATA.forEach(function(v){
+    DOCS.forEach(function(dc){
+      var c = classify(v, dc.key);
+      if(c.status==='expired') expiredCt++;
+      else if(c.status==='critical' || c.status==='grace') criticalCt++;
+      else if(c.status==='warning') warningCt++;
+
+      if(c.status==='expired' || c.status==='critical' || c.status==='grace'){
+        var sortKey = c.status==='expired' ? -99999 + (c.daysLeft||0) : (c.daysLeft!==null?c.daysLeft:999);
+        alerts.push({v:v, dc:dc, c:c, sortKey:sortKey});
+      }
+    });
+  });
+
+  document.getElementById('kpiExpired').textContent = expiredCt;
+  document.getElementById('kpiCritical').textContent = criticalCt;
+  document.getElementById('kpiWarning').textContent = warningCt;
+  document.getElementById('kpiTotal').textContent = DATA.length;
+
+  alerts.sort(function(a,b){ return a.sortKey-b.sortKey; });
+  document.getElementById('alertCount').textContent = alerts.length;
+  var alertList = document.getElementById('alertList');
+  alertList.innerHTML = '';
+  if(alerts.length===0){
+    alertList.innerHTML = '<div class="empty-state"><b>All clear.</b> Nothing urgent right now — every document is within safe range.</div>';
+  } else {
+    alerts.slice(0,25).forEach(function(a){
+      var div = document.createElement('div');
+      div.className = 'alert' + (a.c.status!=='expired' ? ' amber' : '');
+      var badgeTxt = a.c.status==='expired' ? 'EXPIRED' : (a.c.status==='grace' ? 'GRACE' : 'URGENT');
+      div.innerHTML =
+        '<span class="badge">'+badgeTxt+'</span>'+
+        '<span class="veh">'+a.v.vehicle_no+'</span>'+
+        '<span class="doc"><b>'+a.dc.label+'</b> — '+a.v.name+'</span>'+
+        '<span class="days">'+a.c.label+'</span>';
+      div.addEventListener('click', function(){ openModal(a.v, a.dc.key); });
+      alertList.appendChild(div);
+    });
+  }
+
+  var rows = DATA.slice();
+  if(q){
+    rows = rows.filter(function(v){
+      return v.vehicle_no.toLowerCase().indexOf(q)>-1 || (v.name||'').toLowerCase().indexOf(q)>-1;
+    });
+  }
+  if(filter==='urgent'){
+    rows = rows.filter(function(v){
+      return DOCS.some(function(dc){
+        var s = classify(v,dc.key).status;
+        return s==='expired' || s==='critical' || s==='grace';
+      });
+    });
+  }
+  rows.sort(function(a,b){
+    function worst(v){
+      var vals = DOCS.map(function(dc){
+        var c = classify(v, dc.key);
+        if(c.status==='expired') return -99999+(c.daysLeft||0);
+        if(c.status==='none' || c.status==='skip') return 100000;
+        return c.daysLeft!==null? c.daysLeft:100000;
+      });
+      return Math.min.apply(null, vals);
+    }
+    return worst(a)-worst(b);
+  });
+
+  var tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  rows.forEach(function(v){
+    var tr = document.createElement('tr');
+    var html = '<td class="vehcell"><div class="vno">'+v.vehicle_no+'</div><div class="vname">'+v.name+'</div></td>';
+    DOCS.forEach(function(dc){
+      var c = classify(v, dc.key);
+      var d = getDocData(v, dc.key);
+      var dateTxt = (d && d.to) ? displayDate(d.to) : '—';
+      var extra = '';
+      if(dc.key==='tax'){
+        var amt = taxAmount(v);
+        if(amt) extra = '<div class="days">₹'+amt.toLocaleString('en-IN')+' · '+v.tyre_no+' tyre</div>';
+      }
+      html += '<td><div class="cell-doc '+statusClass(c.status)+'" data-v="'+v.vehicle_no+'" data-doc="'+dc.key+'">'+
+        '<div class="date">'+dateTxt+'</div>'+
+        '<div class="days">'+c.label+'</div>'+extra+
+        '</div></td>';
+    });
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+
+  Array.prototype.forEach.call(tbody.querySelectorAll('.cell-doc'), function(el){
+    el.addEventListener('click', function(){
+      var vno = el.getAttribute('data-v'), doc = el.getAttribute('data-doc');
+      var v = DATA.filter(function(x){ return x.vehicle_no===vno; })[0];
+      if(v) openModal(v, doc);
+    });
+  });
+}
+
+/* ================= MONTHLY RENDER ================= */
+function buildMonthChips(){
+  var container = document.getElementById('monthChips');
+  container.innerHTML = '';
+  var today = todayMidnight();
+  var entries = allEntries();
+
+  for(var i=0;i<12;i++){
+    var y = today.getFullYear();
+    var m = today.getMonth()+i;
+    y += Math.floor(m/12);
+    m = m%12;
+    var cnt = entries.filter(function(e){ return e.to.getFullYear()===y && e.to.getMonth()===m; }).length;
+    var hasUrgent = entries.some(function(e){
+      return e.to.getFullYear()===y && e.to.getMonth()===m && (e.c.status==='expired'||e.c.status==='critical'||e.c.status==='grace');
+    });
+    var chip = document.createElement('div');
+    chip.className = 'month-chip' + (hasUrgent?' has-urgent':'');
+    chip.dataset.y = y; chip.dataset.m = m;
+    chip.innerHTML = MONTH_SHORT[m]+" '"+String(y).slice(2)+'<span class="cnt">'+cnt+'</span>';
+    chip.addEventListener('click', function(){ selectMonth(parseInt(this.dataset.y,10), parseInt(this.dataset.m,10)); });
+    container.appendChild(chip);
+  }
+  if(!selectedMonth){
+    selectedMonth = {year: today.getFullYear(), month: today.getMonth()};
+  }
+}
+
+function buildJumpSelects(){
+  var mSel = document.getElementById('jumpMonth');
+  var ySel = document.getElementById('jumpYear');
+  if(mSel.options.length===0){
+    MONTH_NAMES.forEach(function(name,i){
+      var o = document.createElement('option');
+      o.value=i; o.textContent=name;
+      mSel.appendChild(o);
+    });
+    mSel.addEventListener('change', function(){
+      selectMonth(parseInt(ySel.value,10), parseInt(mSel.value,10));
+    });
+  }
+  var entries = allEntries();
+  var years = {};
+  var today = todayMidnight();
+  years[today.getFullYear()] = true;
+  entries.forEach(function(e){ years[e.to.getFullYear()] = true; });
+  var yearList = Object.keys(years).map(Number).sort(function(a,b){return a-b;});
+  var existing = Array.prototype.map.call(ySel.options, function(o){ return o.value; }).join(',');
+  var wanted = yearList.join(',');
+  if(existing !== wanted){
+    ySel.innerHTML = '';
+    yearList.forEach(function(y){
+      var o = document.createElement('option');
+      o.value=y; o.textContent=y;
+      ySel.appendChild(o);
+    });
+    ySel.addEventListener('change', function(){
+      selectMonth(parseInt(ySel.value,10), parseInt(mSel.value,10));
+    });
+  }
+}
+
+function selectMonth(y, m){
+  selectedMonth = {year:y, month:m};
+  renderMonthly();
+}
+
+function renderMonthly(){
+  buildMonthChips();
+  buildJumpSelects();
+
+  if(!selectedMonth){
+    var t = todayMidnight();
+    selectedMonth = {year:t.getFullYear(), month:t.getMonth()};
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.month-chip'), function(chip){
+    var isActive = parseInt(chip.dataset.y,10)===selectedMonth.year && parseInt(chip.dataset.m,10)===selectedMonth.month;
+    chip.classList.toggle('active', isActive);
+  });
+  document.getElementById('jumpMonth').value = selectedMonth.month;
+  document.getElementById('jumpYear').value = selectedMonth.year;
+
+  var entries = allEntries().filter(function(e){
+    return e.to.getFullYear()===selectedMonth.year && e.to.getMonth()===selectedMonth.month;
+  });
+  entries.sort(function(a,b){ return a.to-b.to; });
+
+  var expiredN = entries.filter(function(e){return e.c.status==='expired';}).length;
+  var urgentN = entries.filter(function(e){return e.c.status==='critical'||e.c.status==='grace';}).length;
+
+  var summary = document.getElementById('monthSummary');
+  if(entries.length===0){
+    summary.innerHTML = 'No documents scheduled to expire in <b>'+MONTH_NAMES[selectedMonth.month]+' '+selectedMonth.year+'</b>.';
+  } else {
+    summary.innerHTML = '<b>'+entries.length+'</b> item(s) expiring in <b>'+MONTH_NAMES[selectedMonth.month]+' '+selectedMonth.year+'</b>'
+      + (expiredN? ' &middot; <b style="color:var(--red)">'+expiredN+' already expired</b>':'')
+      + (urgentN? ' &middot; <b style="color:var(--amber)">'+urgentN+' due very soon</b>':'');
+  }
+
+  var list = document.getElementById('monthList');
+  list.innerHTML = '';
+  if(entries.length===0){
+    list.innerHTML = '<div class="empty-state">Nothing due this month. Try another month above.</div>';
+    return;
+  }
+  entries.forEach(function(e){
+    var row = document.createElement('div');
+    row.className = 'month-row';
+    var amt = e.dc.key==='tax' ? taxAmount(e.v) : null;
+    row.innerHTML =
+      '<div class="datebox"><div class="dnum">'+pad2(e.to.getDate())+'</div><div class="dwd">'+WD_SHORT[e.to.getDay()]+'</div></div>'+
+      '<div class="info"><div class="v">'+e.v.vehicle_no+'</div><div class="n">'+e.v.name+(amt?(' · ₹'+amt.toLocaleString('en-IN')+' ('+e.v.tyre_no+' tyre)'):'')+'</div></div>'+
+      '<span class="docpill" style="background:'+e.dc.color+'22;color:'+e.dc.color+'">'+e.dc.label+'</span>'+
+      '<span class="statuspill '+statusClass(e.c.status)+'" style="padding:5px 10px;border-radius:8px;">'+e.c.label+'</span>';
+    row.addEventListener('click', function(){ openModal(e.v, e.dc.key); });
+    list.appendChild(row);
+  });
+}
+
+/* ================= MODAL ================= */
+function openModal(v, docKey){
+  currentEdit = {vno:v.vehicle_no, doc:docKey};
+  var dc = DOCS.filter(function(d){ return d.key===docKey; })[0];
+  document.getElementById('mTitle').textContent = v.vehicle_no+' — '+dc.label;
+  var amt = docKey==='tax' ? taxAmount(v) : null;
+  document.getElementById('mSub').textContent = v.name + (amt ? (' · ₹'+amt+' ('+v.tyre_no+' tyre)') : '');
+  var d = getDocData(v, docKey) || {};
+  document.getElementById('mFrom').value = d.from || '';
+  document.getElementById('mTo').value = d.to || '';
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('show');
+  currentEdit = null;
+}
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('overlay').addEventListener('click', function(e){ if(e.target.id==='overlay') closeModal(); });
+
+document.getElementById('mSave').addEventListener('click', function(){
+  if(!currentEdit) return;
+  var from = document.getElementById('mFrom').value || null;
+  var to = document.getElementById('mTo').value || null;
+  overrides[ovKey(currentEdit.vno, currentEdit.doc)] = {from:from, to:to};
+  saveOverrides().then(function(){
+    closeModal();
+    renderAll();
+  });
+});
+document.getElementById('mReset').addEventListener('click', function(){
+  if(!currentEdit) return;
+  delete overrides[ovKey(currentEdit.vno, currentEdit.doc)];
+  saveOverrides().then(function(){
+    closeModal();
+    renderAll();
+  });
+});
+
+/* ================= WIRING ================= */
+function renderAll(){
+  try{
+    renderOverview();
+    renderMonthly();
+  }catch(err){
+    var b = document.getElementById('errBanner');
+    if(b){
+      b.style.display='block';
+      b.textContent = 'Render issue: ' + err.message + '. Try reloading the page.';
+    }
+    console.error(err);
+  }
+}
+
+document.getElementById('search').addEventListener('input', renderOverview);
+Array.prototype.forEach.call(document.querySelectorAll('#view-overview .chip'), function(chip){
+  chip.addEventListener('click', function(){
+    Array.prototype.forEach.call(document.querySelectorAll('#view-overview .chip'), function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    renderOverview();
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(tab){
+  tab.addEventListener('click', function(){
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){ t.classList.remove('active'); });
+    Array.prototype.forEach.call(document.querySelectorAll('.view'), function(v){ v.classList.remove('active'); });
+    tab.classList.add('active');
+    document.getElementById('view-'+tab.dataset.tab).classList.add('active');
+    activeTab = tab.dataset.tab;
+    if(activeTab==='monthly') renderMonthly();
+  });
+});
+
+function init(){
+  detectStorage();
+  loadOverrides().then(function(){
+    renderAll();
+    setInterval(renderAll, 60*1000);
+  }).catch(function(err){
+    console.error(err);
+    renderAll();
+    setInterval(renderAll, 60*1000);
+  });
+}
+
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
