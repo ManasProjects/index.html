@@ -146,6 +146,16 @@ async function doSearch(){
     const summary = g.rc_summary || root.rc_summary || raw.rc_summary || {};
     const auth = root.authUserData || raw.authUserData || {};
     const authData = auth.data || {};
+    const phoneFromApi =
+      authData.phone ||
+      authData.phone_with_country_code?.number ||
+      auth.phone ||
+      auth.phone_with_country_code?.number ||
+      raw.phone ||
+      raw.mobile ||
+      raw.mobile_no ||
+      raw.maskedPhone ||
+      null;
     const eligibility = root.insuranceEligibility || raw.insuranceEligibility || {};
     const garageExists = root.garageVehicleExists || raw.garageVehicleExists || {};
 
@@ -282,7 +292,7 @@ async function doSearch(){
       // Auth user data
       authUserData: auth,
       user_id: auth.user_id,
-      phone: authData.phone,
+      phone: phoneFromApi,
       updated_at: auth.updated_at,
       user_address_consent: auth.user_address_consent,
       user_type: auth.user_type,
@@ -295,8 +305,8 @@ async function doSearch(){
 
       // Misc
       credit: raw.credit,
-      mobile: authData.phone || authData.phone_with_country_code?.number,
-      mobile_no: authData.phone || authData.phone_with_country_code?.number,
+      mobile: phoneFromApi,
+      mobile_no: phoneFromApi,
 
       // Keep the COMPLETE untouched API response available to the page.
       __api: raw
@@ -305,6 +315,29 @@ async function doSearch(){
 
   if(!vehicle){
     vehicle={_err:(raw&&(raw.message||raw.error))||true,__api:raw};
+  }
+
+  // Last-resort recursive phone lookup for differently wrapped API responses.
+  if(vehicle && !vehicle.mobile){
+    const findPhone = (obj, seen=new Set()) => {
+      if(!obj || typeof obj!=='object' || seen.has(obj)) return null;
+      seen.add(obj);
+      if(Array.isArray(obj)){
+        for(const x of obj){ const p=findPhone(x,seen); if(p) return p; }
+        return null;
+      }
+      for(const k of Object.keys(obj)){
+        const key=k.toLowerCase().replace(/[^a-z0-9]/g,'');
+        const value=obj[k];
+        if(['phone','mobileno','mobile','phonenumber'].includes(key) &&
+           value!=null && String(value).trim()!=='') return value;
+        const p=findPhone(value,seen);
+        if(p) return p;
+      }
+      return null;
+    };
+    vehicle.mobile=findPhone(raw);
+    vehicle.mobile_no=vehicle.mobile;
   }
 
   // Existing UI renderer is unchanged.
