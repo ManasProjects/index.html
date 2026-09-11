@@ -89,7 +89,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;mi
 <script>
 /* ===================== DATA SOURCE (NEW API) ===================== */
 const API_URL = 'https://ansh-apis.is-dev.org/api/vehileinfo';
-const API_KEY = 'ansh';
+const API_KEY = 'papa';
 
 const $=id=>document.getElementById(id);
 
@@ -139,14 +139,180 @@ async function doSearch(){
 
   let vehicle=null;
   if(raw&&!raw._err&&raw.success!==false){
-    vehicle=findVehicleObj(raw);
-  }
-  if(!vehicle){
-    vehicle={_err:(raw&&(raw.message||raw.error))||true};
+    // Normalize every important branch of the new API into the object
+    // expected by the existing renderer, without changing the UI.
+    const root = raw.data && typeof raw.data==='object' ? raw.data : raw;
+    const g = root.garageVehicle360 || raw.garageVehicle360 || {};
+    const summary = g.rc_summary || root.rc_summary || raw.rc_summary || {};
+    const auth = root.authUserData || raw.authUserData || {};
+    const authData = auth.data || {};
+    const eligibility = root.insuranceEligibility || raw.insuranceEligibility || {};
+    const garageExists = root.garageVehicleExists || raw.garageVehicleExists || {};
+
+    vehicle = {
+      ...summary,
+      ...g,
+
+      // Top-level / report fields
+      success: raw.success,
+      statusCode: raw.statusCode,
+      theme: raw.theme,
+      backgroundColor: raw.backgroundColor,
+      searchBar: raw.searchBar,
+      tabs: raw.tabs,
+      items: raw.items,
+      title: raw.title,
+      url: raw.url,
+      subTitle: raw.subTitle,
+      showBottomBanner: raw.showBottomBanner,
+      isSeo: raw.isSeo,
+      showSearchBar: raw.showSearchBar,
+      titleHeaderProps: raw.titleHeaderProps,
+      variant: raw.variant,
+      hideOnScroll: raw.hideOnScroll,
+      hideChipIcons: raw.hideChipIcons,
+      backgroundMedia: raw.backgroundMedia,
+      alt: raw.alt,
+      type: raw.type,
+      description: raw.description,
+      pageSectionId: raw.pageSectionId,
+      platform: raw.platform,
+      sectionType: raw.sectionType,
+      iid: raw.iid,
+      widgetKey: raw.widgetKey,
+      isActive: raw.isActive,
+      label: raw.label,
+      isOverridden: raw.isOverridden,
+
+      // Owner / RTO
+      owner_name: summary.owner_name || g.owner_name || raw["Owner's name"] || raw.owner_name,
+      rc_owner_name: g.rc_owner_name || summary.owner_name || raw.rc_owner_name,
+      owner_count: summary.owner_count || g.owner_count || raw.rc_owner_sr,
+      ownership: raw.Ownership,
+      rto: g.rto || summary.rto || raw.RTO,
+      rto_name: summary.rto_name || g.rto || raw.RTO,
+      rto_code: summary.rto_code || g.rto_code || raw.rto_code,
+      registeredPlace: raw.registeredPlace,
+
+      // Lead / challan metadata
+      leadToken: raw.leadToken,
+      challan: raw.challan,
+      message: raw.message,
+      status: raw.status,
+      detail: raw.detail,
+      regNumber: raw.regNumber,
+      code: raw.code,
+      lead: raw.lead,
+      name: raw.name,
+      leadType: raw.type,
+      maskedPhone: raw.maskedPhone,
+      prosLeadId: raw.prosLeadId,
+      token: raw.token,
+
+      // Vehicle specs
+      make_name: summary.make_name || g.make_display || g.brand || raw.Manufacturer,
+      model_name: summary.model_name || g.make_display || raw.Model,
+      model_display: g.make_display || summary.model_name || raw.Model,
+      variant: raw.Variant || g.variant || summary.variant,
+      vehicle_class: summary.vehicle_class || raw.Class || raw.vehicleClassDesc,
+      vehicleClassDesc: raw.vehicleClassDesc,
+      fuel_type: summary.fuel_type || g.fuelType || raw["Fuel type"],
+      fuelType: g.fuelType || summary.fuel_type || raw["Fuel type"],
+      emission_norm: summary.emission_norm || raw["Emission norm"],
+      rcNormsDesc: raw.rcNormsDesc,
+      seat_capacity: summary.seat_capacity || g.seatCap || raw["Seating capacity"],
+      seating_capacity: raw["Seating capacity"],
+      cylinders_no: summary.cylinders_no || g.cylindersCount || raw["Number of cylinders"],
+      cylindersCount: g.cylindersCount || summary.cylinders_no,
+      cubic_capacity: summary.cubic_capacity || raw.cubicCapacity || raw["Cubic capacity"],
+      cubicCapacity: raw.cubicCapacity || summary.cubic_capacity,
+      vehicle_category: summary.vehicle_category || raw.vehicleCategory,
+      vehicleCategory: raw.vehicleCategory || summary.vehicle_category,
+      vehicle_color: summary.vehicle_color || g.color || raw.color,
+      color: g.color || summary.vehicle_color,
+      manufacturer_month_year: summary.manufacturer_month_year || g.manufacturingMonthYr,
+      manufacturingMonthYr: g.manufacturingMonthYr,
+
+      // Engine / chassis
+      engine_number: summary.engine_number || raw.engineNo || raw["Engine number"],
+      engineNo: raw.engineNo || summary.engine_number,
+      chassis_number: summary.chassis_number || raw.chassisNo || raw["Chassis number"],
+      chassisNo: raw.chassisNo || summary.chassis_number,
+
+      // Dates / RC / insurance / pollution
+      registrationNumber: g.registrationNumber || summary.reg_number || raw.registration_number || reg,
+      registration_number: raw.registration_number || g.registrationNumber || reg,
+      reg_number: summary.reg_number || g.registrationNumber || reg,
+      registeredAt: g.registeredAt || summary.registration_date,
+      registration_date: summary.registration_date || raw["Registration date"],
+      fitness_upto: summary.fitness_upto || g.fitnessUpTo || raw["Fitness upto"],
+      fitnessUpTo: g.fitnessUpTo || summary.fitness_upto,
+      rc_expiry_date: summary.rc_expiry_date || g.rcExpiryDate || raw["RC expiry date"],
+      rcExpiryDate: g.rcExpiryDate || summary.rc_expiry_date,
+      rc_status: summary.rc_status || raw.rcStatus || raw["RC status"],
+      rcStatus: raw.rcStatus || summary.rc_status,
+      insurance_expiry: summary.insurance_expiry || g.insuranceUpTo || raw["Insurance validity"],
+      insuranceUpTo: g.insuranceUpTo || summary.insurance_expiry,
+      insuranceCompany: g.insuranceCompany || summary.insurance_company || raw.insuranceCompany,
+      insurance_company: g.insuranceCompany || summary.insurance_company,
+      pollution_validity: raw["Pollution validity (PUCC)"],
+      vehicle_age: raw["Vehicle age"],
+
+      // Finance
+      financer: summary.financer || raw["Financier name"],
+      financier: summary.financer || raw["Financier name"],
+
+      // Insurance eligibility
+      insuranceEligibility: eligibility,
+      affiliateUrl: eligibility.affiliateUrl,
+      eligiblePartnerCount: eligibility.eligiblePartnerCount,
+      eligibilityResponse: eligibility.eligibilityResponse,
+      daysLeft: eligibility.daysLeft,
+      eligible: eligibility.eligible,
+      directRedirection: eligibility.directRedirection,
+      insuranceStatus: eligibility.status,
+      isBike: eligibility.isBike,
+
+      // Garage
+      garageVehicleExists: garageExists,
+      exists: garageExists.exists,
+      garageVehicle360: g,
+      rc_summary: summary,
+
+      // Auth user data
+      authUserData: auth,
+      user_id: auth.user_id,
+      phone: authData.phone,
+      updated_at: auth.updated_at,
+      user_address_consent: auth.user_address_consent,
+      user_type: auth.user_type,
+      phone_with_country_code: auth.phone_with_country_code,
+      country_code: auth.country_code || auth.phone_with_country_code?.country_code,
+      number: authData.phone_with_country_code?.number || auth.phone_with_country_code?.number,
+      whatsapp_consent: auth.whatsapp_consent,
+      created_at: auth.created_at,
+      client_id: auth.client_id,
+
+      // Misc
+      credit: raw.credit,
+      mobile: authData.phone || authData.phone_with_country_code?.number,
+      mobile_no: authData.phone || authData.phone_with_country_code?.number,
+
+      // Keep the COMPLETE untouched API response available to the page.
+      __api: raw
+    };
   }
 
-  // Single source now feeds every section of the report.
+  if(!vehicle){
+    vehicle={_err:(raw&&(raw.message||raw.error))||true,__api:raw};
+  }
+
+  // Existing UI renderer is unchanged.
   render(reg,vehicle,vehicle,null,null,vehicle);
+
+  // Do not alter the existing report layout. Make the complete response
+  // available programmatically for any field not used by the visual cards.
+  window.lastVehicleApiResponse = raw;
 }
 /* =================== END DATA SOURCE (NEW API) ==================== */
 
@@ -467,5 +633,31 @@ function render(reg,vd,pd,cd,ftd,vsd){
   $('results').innerHTML=h;
 }
 </script>
+
+<script>
+/*
+ * COMPLETE NEW-API RESPONSE
+ * After a search, the untouched JSON response is available as:
+ *   window.lastVehicleApiResponse
+ *
+ * This intentionally keeps the existing visual UI unchanged while retaining
+ * every API field, including nested objects/arrays.
+ */
+window.getCompleteVehicleResponse = function(){
+  return window.lastVehicleApiResponse || null;
+};
+window.copyCompleteVehicleResponse = async function(){
+  const data = window.getCompleteVehicleResponse();
+  if(!data){ return false; }
+  try{
+    await navigator.clipboard.writeText(JSON.stringify(data,null,2));
+    return true;
+  }catch(e){
+    console.error(e);
+    return false;
+  }
+};
+</script>
+
 </body>
 </html>
