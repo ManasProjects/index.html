@@ -135,81 +135,130 @@ async function doSearch(){
   st.className='status'; $('searchBtn').disabled=false;
 
   let vehicle=null;
-  if(raw&&!raw._err&&raw.success!==false){
-    const debug=raw.debug&&typeof raw.debug==='object'?raw.debug:{};
-    const root=raw.data&&typeof raw.data==='object'?raw.data:raw;
-    const g=debug.garageVehicle360||root.garageVehicle360||raw.garageVehicle360||{};
-    const summary=g.rc_summary||root.rc_summary||raw.rc_summary||{};
-    const auth=debug.authUserData||root.authUserData||raw.authUserData||{};
-    const authData=auth.data&&typeof auth.data==='object'?auth.data:{};
-    const eligibility=debug.insuranceEligibility||root.insuranceEligibility||raw.insuranceEligibility||{};
-    const garageExists=debug.garageVehicleExists||root.garageVehicleExists||raw.garageVehicleExists||{};
+  if(raw && !raw._err && raw.success!==false){
+    const debug=raw.debug||{};
+    const g=debug.garageVehicle360||{};
+    const detail=g.detail||{};
+    const summary=detail.rc_summary||{};
+    const auth=debug.authUserData||{};
+    const authData=auth.data||{};
+    const meta=raw.data?.meta||{};
+    const eligibility=meta.insuranceEligibility?.data||meta.insuranceEligibility||{};
 
-    const mobile=authData.phone||authData.phone_with_country_code?.number||
-                 auth.phone||auth.phone_with_country_code?.number||
-                 raw.phone||raw.mobile||raw.mobile_no||raw.maskedPhone||null;
+    const pairMap={};
+    const walk=(o)=>{
+      if(!o||typeof o!=='object')return;
+      if(Array.isArray(o)){o.forEach(walk);return}
+      if(typeof o.title==='string' && Object.prototype.hasOwnProperty.call(o,'subTitle')){
+        pairMap[o.title.trim().toLowerCase()]=o.subTitle;
+      }
+      Object.keys(o).forEach(k=>walk(o[k]));
+    };
+    walk(raw);
+
+    const pick=(...keys)=>{
+      for(const key of keys){
+        const v=pairMap[key.toLowerCase()];
+        if(v!=null && String(v).trim()!=='') return v;
+      }
+      return null;
+    };
+
+    const mobile=authData.phone||
+      authData.phone_with_country_code?.number||
+      auth.phone||
+      auth.phone_with_country_code?.number||null;
 
     vehicle={
-      ...summary,...g,
-      registrationNumber:g.registrationNumber||summary.reg_number||raw.registration_number||reg,
-      registration_number:raw.registration_number||g.registrationNumber||reg,
-      reg_number:summary.reg_number||g.registrationNumber||reg,
-      owner_name:summary.owner_name||g.owner_name||raw["Owner's name"]||raw.owner_name,
-      rc_owner_name:g.rc_owner_name||summary.owner_name||raw.rc_owner_name,
-      mobile:mobile,mobile_no:mobile,mobileNo:mobile,phone:mobile,
+      ...summary,...detail,
 
-      make_name:summary.make_name||g.brand||raw.Manufacturer,
-      model_name:summary.model_name||raw.Model,
-      model_display:g.make_display||summary.model_name||raw.Model,
-      variant:raw.Variant||summary.variant,
-      vehicle_class:summary.vehicle_class||raw.Class||raw.vehicleClassDesc,
-      vehicleClassDesc:raw.vehicleClassDesc,
-      fuel_type:summary.fuel_type||g.fuelType||raw["Fuel type"],
-      fuelType:g.fuelType||summary.fuel_type||raw["Fuel type"],
-      emission_norm:summary.emission_norm||raw["Emission norm"],
-      seat_capacity:summary.seat_capacity||g.seatCap||raw["Seating capacity"],
-      seating_capacity:raw["Seating capacity"],
-      cylinders_no:summary.cylinders_no||g.cylindersCount||raw["Number of cylinders"],
-      cylindersCount:g.cylindersCount||summary.cylinders_no,
-      cubic_capacity:summary.cubic_capacity||raw.cubicCapacity||raw["Cubic capacity"],
-      cubicCapacity:raw.cubicCapacity||summary.cubic_capacity,
-      engine_number:summary.engine_number||raw.engineNo||raw["Engine number"],
-      engineNo:raw.engineNo||summary.engine_number,
-      chassis_number:summary.chassis_number||raw.chassisNo||raw["Chassis number"],
-      chassisNo:raw.chassisNo||summary.chassis_number,
+      registrationNumber:detail.registrationNumber||summary.reg_number||raw.registration_number||reg,
+      registration_number:raw.registration_number||detail.registrationNumber||reg,
+      reg_number:summary.reg_number||detail.registrationNumber||reg,
 
-      registration_date:summary.registration_date||raw["Registration date"],
-      fitness_upto:summary.fitness_upto||g.fitnessUpTo||raw["Fitness upto"],
-      fitnessUpTo:g.fitnessUpTo||summary.fitness_upto,
-      rc_expiry_date:summary.rc_expiry_date||g.rcExpiryDate||raw["RC expiry date"],
-      rcExpiryDate:g.rcExpiryDate||summary.rc_expiry_date,
-      rc_status:summary.rc_status||raw.rcStatus||raw["RC status"],
-      rcStatus:raw.rcStatus||summary.rc_status,
-      insurance_expiry:summary.insurance_expiry||g.insuranceUpTo||raw["Insurance validity"],
-      insuranceUpTo:g.insuranceUpTo||summary.insurance_expiry,
-      insuranceCompany:g.insuranceCompany||summary.insurance_company,
-      financer:summary.financer||raw["Financier name"],
-      financier:summary.financer||raw["Financier name"],
-      rto:g.rto||summary.rto||raw.RTO,
-      rto_name:summary.rto_name||g.rto||raw.RTO,
-      rto_code:summary.rto_code||g.rto_code||raw.rto_code,
+      owner_name:summary.owner_name||detail.rc_owner_name||pick("owner's name"),
+      rc_owner_name:detail.rc_owner_name||summary.owner_name,
+      owner_count:summary.owner_count||detail.rc_owner_sr||pick("owner count")||'1',
+      ownership:pick('ownership'),
+      rto:detail.rto||summary.rto_name||pick('rto'),
+      rto_name:summary.rto_name||detail.rto||pick('rto'),
+      rto_code:summary.rto_code||detail.RTO?.rto_code,
+
+      make_name:summary.make_name||detail.brand?.make_display||pick('manufacturer'),
+      model_name:summary.model_name||detail.model?.model_display||pick('model'),
+      model_display:detail.model?.model_display||summary.model_name||pick('model'),
+      variant:pick('variant'),
+      vehicle_class:summary.vehicle_class||detail.vehicleClassDesc||pick('class'),
+      vehicleClassDesc:detail.vehicleClassDesc||pick('class'),
+      fuel_type:summary.fuel_type||detail.fuelType||pick('fuel type'),
+      fuelType:detail.fuelType||summary.fuel_type||pick('fuel type'),
+      emission_norm:summary.emission_norm||detail.rcNormsDesc||pick('emission norm'),
+      rcNormsDesc:detail.rcNormsDesc||pick('emission norm'),
+      seat_capacity:summary.seat_capacity||detail.seatCap||pick('seating capacity'),
+      seating_capacity:pick('seating capacity'),
+      cylinders_no:summary.cylinders_no||detail.cylindersCount||pick('number of cylinders'),
+      cylindersCount:detail.cylindersCount||summary.cylinders_no,
+      cubic_capacity:summary.cubic_capacity||detail.cubicCapacity||pick('cubic capacity'),
+      cubicCapacity:detail.cubicCapacity||summary.cubic_capacity,
+      vehicle_category:summary.vehicle_category||detail.vehicleCategory,
+      vehicleCategory:detail.vehicleCategory||summary.vehicle_category,
+      color:detail.color||summary.vehicle_color,
+      vehicle_color:summary.vehicle_color||detail.color,
+      manufacturer_month_year:summary.manufacturer_month_year||detail.manufacturingMonthYr,
+
+      engine_number:summary.engine_number||detail.engineNo||pick('engine number'),
+      engineNo:detail.engineNo||summary.engine_number,
+      chassis_number:summary.chassis_number||detail.chassisNo||pick('chassis number'),
+      chassisNo:detail.chassisNo||summary.chassis_number,
+
+      registration_date:summary.registration_date||pick('registration date'),
+      registeredAt:detail.registeredAt||summary.registration_date,
+      fitness_upto:summary.fitness_upto||detail.fitnessUpTo||pick('fitness upto'),
+      fitnessUpTo:detail.fitnessUpTo||summary.fitness_upto,
+      insurance_expiry:summary.insurance_expiry||detail.insuranceUpTo||pick('insurance validity'),
+      insuranceUpTo:detail.insuranceUpTo||summary.insurance_expiry,
+      insuranceCompany:detail.insuranceCompany||summary.insurance_company,
+      insurance_company:detail.insuranceCompany||summary.insurance_company,
+      rc_expiry_date:summary.rc_expiry_date||detail.rcExpiryDate||pick('rc expiry date'),
+      rcExpiryDate:detail.rcExpiryDate||summary.rc_expiry_date,
+      rc_status:summary.rc_status||detail.rcStatus||pick('rc status'),
+      rcStatus:detail.rcStatus||summary.rc_status,
+      vehicle_age:pick('vehicle age'),
+      pollution_validity:pick('pollution validity (pucc)'),
+      financer:summary.financer||pick('financier name'),
+      financier:summary.financer||pick('financier name'),
 
       insuranceEligibility:eligibility,
-      garageVehicleExists:garageExists,
-      exists:garageExists.exists,
+      affiliateUrl:eligibility.affiliateUrl,
+      eligiblePartnerCount:eligibility.eligiblePartnerCount,
+      eligibilityResponse:eligibility.eligibilityResponse,
+      daysLeft:eligibility.daysLeft,
+      eligible:eligibility.eligible,
+      directRedirection:eligibility.directRedirection,
+      insuranceStatus:eligibility.status,
+      isBike:eligibility.isBike,
+
+      garageVehicleExists:debug.garageVehicleExists||{},
+      exists:debug.garageVehicleExists?.exists,
       garageVehicle360:g,
       rc_summary:summary,
+
       authUserData:auth,
       user_id:auth.user_id,
-      updated_at:auth.updated_at,
-      user_address_consent:auth.user_address_consent,
-      user_type:auth.user_type,
-      phone_with_country_code:auth.phone_with_country_code,
-      country_code:auth.country_code||auth.phone_with_country_code?.country_code,
-      number:authData.phone_with_country_code?.number||auth.phone_with_country_code?.number,
-      whatsapp_consent:auth.whatsapp_consent,
-      created_at:auth.created_at,
+      phone:mobile,
+      mobile:mobile,
+      mobile_no:mobile,
+      mobileNo:mobile,
+      updated_at:authData.updated_at,
+      user_address_consent:authData.user_address_consent,
+      user_type:authData.user_type,
+      phone_with_country_code:authData.phone_with_country_code,
+      country_code:authData.country_code||authData.phone_with_country_code?.country_code,
+      number:authData.phone_with_country_code?.number,
+      whatsapp_consent:authData.whatsapp_consent,
+      created_at:authData.created_at,
       client_id:auth.client_id,
+
       credit:raw.credit,
       __api:raw
     };
@@ -537,9 +586,5 @@ function render(reg,vd,pd,cd,ftd,vsd){
   $('results').innerHTML=h;
 }
 </script>
-<script>
-window.getCompleteVehicleResponse=function(){return window.lastVehicleApiResponse||null};
-</script>
 </body>
 </html>
-
